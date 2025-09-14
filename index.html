@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ティッシュ配布スケジューラ（チーム向け）</title>
+  <style>
+    :root{--accent:#0ea5a4;--red:#ef4444;--muted:#6b7280}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans JP',sans-serif;margin:0;padding:16px;background:#f8fafc;color:#0f172a}
+    header{display:flex;justify-content:space-between;align-items:center}
+    h1{margin:0;font-size:18px}
+    main{display:grid;grid-template-columns:320px 1fr 420px;gap:16px;margin-top:12px}
+    .card{background:#fff;border-radius:12px;padding:12px;box-shadow:0 6px 18px rgba(2,6,23,0.06)}
+    label{display:block;margin-top:8px;font-size:13px;color:var(--muted)}
+    input,textarea,select,button{width:100%;padding:8px;border-radius:8px;border:1px solid #e6e9ef;margin-top:6px;font-size:14px}
+    button{cursor:pointer;background:var(--accent);color:#fff;border:none}
+    .muted{color:var(--muted);font-size:13px}
+    .list{max-height:260px;overflow:auto;margin-top:8px}
+    .item{padding:8px;border-radius:8px;border:1px solid #eef2ff;margin-bottom:8px}
+    .chip{display:inline-block;padding:6px 8px;border-radius:999px;background:#f1f5f9;margin:4px;font-size:13px}
+    .flex{display:flex;gap:8px;align-items:center}
+    .small{font-size:13px}
+    .pair{padding:8px;border-radius:8px;border:1px dashed #e6f4ea;margin-bottom:6px}
+    .photos img{max-width:100px;margin:6px;border-radius:6px}
+    .chat{height:300px;overflow:auto;border-radius:8px;padding:8px;border:1px solid #eef2ff;background:#ffffff}
+    @media(max-width:1100px){main{grid-template-columns:1fr} .chat{height:200px}}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ティッシュ配布スケジューラ（簡易版）</h1>
+    <div class="muted small">1人 または 2人組で配布 — グループ向け</div>
+  </header>
+
+  <main>
+    <!-- left: 管理 (場所/日付/参加者) -->
+    <section class="card">
+      <h3>配布場所（追加/削除可）</h3>
+      <label>場所名</label>
+      <input id="loc-name" placeholder="例：駅前Aブロック" />
+      <div style="display:flex;gap:8px;margin-top:8px"><button id="add-loc">追加</button><button id="clear-locs" style="background:var(--red)">全削除</button></div>
+      <div class="list" id="loc-list"></div>
+
+      <hr />
+
+      <h3>日程候補</h3>
+      <label>日付</label>
+      <input type="date" id="date-input" />
+      <label>時間帯（任意）</label>
+      <select id="time-slot"><option>午前</option><option>午後</option><option>夕方</option></select>
+      <div style="display:flex;gap:8px;margin-top:8px"><button id="add-date">追加</button><button id="clear-dates" style="background:var(--red)">全削除</button></div>
+      <div class="list" id="date-list"></div>
+
+      <hr />
+
+      <h3>参加者管理</h3>
+      <label>名前</label>
+      <input id="participant-name" placeholder="例：たかし" />
+      <div style="display:flex;gap:8px;margin-top:8px"><button id="add-participant">追加</button><button id="clear-participants" style="background:var(--red)">全削除</button></div>
+      <div class="list" id="participant-list"></div>
+    </section>
+
+    <!-- middle: 投票（いける）とペアリング実行 -->
+    <section class="card">
+      <h3>出欠（"いける" を選ぶとその日の希望配布場所を選択）</h3>
+      <div class="flex">
+        <select id="vote-participant"></select>
+        <button id="start-vote">投票開始</button>
+      </div>
+      <div id="vote-area" style="margin-top:8px"></div>
+
+      <hr />
+
+      <h3>ペアリング（選択して実行）</h3>
+      <label>日付を選択</label>
+      <select id="pair-date-select"></select>
+      <div style="display:flex;gap:8px;margin-top:8px"><button id="run-pairing">ペアリング実行</button><button id="auto-assign" style="background:#6b7280">全日自動実行</button></div>
+      <div id="pair-result" style="margin-top:8px"></div>
+
+      <hr />
+
+      <h3>配布後の記録（感想・写真）</h3>
+      <label>対象日</label>
+      <select id="report-date"></select>
+      <label>対象ペア（選択）</label>
+      <select id="report-pair"></select>
+      <label>感想</label>
+      <textarea id="report-note" rows="3"></textarea>
+      <label>写真（複数可）</label>
+      <input id="report-photos" type="file" accept="image/*" multiple />
+      <div style="display:flex;gap:8px;margin-top:8px"><button id="save-report">保存</button><button id="view-reports" style="background:#6b7280">一覧表示</button></div>
+      <div id="reports-list" style="margin-top:8px"></div>
+    </section>
+
+    <!-- right: チャット/コメント & 状態表示 -->
+    <section class="card">
+      <h3>グループチャット</h3>
+      <div class="chat" id="chat-box"></div>
+      <div style="display:flex;gap:8px;margin-top:8px"><input id="chat-name" placeholder="名前" /><input id="chat-msg" placeholder="メッセージ" /><button id="send-chat">送信</button></div>
+
+      <hr />
+
+      <h3>保存 / 読み込み</h3>
+      <div style="display:flex;gap:8px"><button id="save-local">localStorage保存</button><button id="load-local" style="background:#6b7280">読み込み</button><button id="export-json">共有用コピー</button></div>
+      <div style="margin-top:8px" class="muted small">※このサンプルはローカル動作です。共有はJSONのコピーで実施してください。</div>
+    </section>
+  </main>
+
+  <script>
+    // --- State ---
+    const state = {
+      locations: [], // {id,name}
+      dates: [], // {id,date,slot}
+      participants: [], // {id,name}
+      votes: {}, // votes[participantId][dateId] = {available:bool, locId}
+      pairings: {}, // pairings[dateId] = [{members:[id,id?], locId, pairId}]
+      reports: [], // {dateId,pairId,note,photos:[dataURL],timestamp}
+      chat: [] // {name,msg,ts}
+    };
+
+    // --- Helpers ---
+    const q = s => document.querySelector(s);
+    const uid = (n=6)=>Math.random().toString(36).slice(2,2+n);
+    function persist(){localStorage.setItem('tissue_state', JSON.stringify(state));}
+
+    // --- Render helpers ---
+    function renderLocations(){ const el = q('#loc-list'); el.innerHTML = ''; state.locations.forEach(l=>{
+      const d = document.createElement('div'); d.className='item'; d.innerHTML = `<strong>${l.name}</strong> <div class="muted small">ID:${l.id}</div><div style="margin-top:6px"><button data-id="${l.id}" class="del-loc" style="background:var(--red)">削除</button></div>`;
+      el.appendChild(d);
+    }); document.querySelectorAll('.del-loc').forEach(b=>b.addEventListener('click',e=>{const id=e.target.dataset.id; state.locations=state.locations.filter(x=>x.id!==id); // remove references in votes
+      for(const pid in state.votes){ for(const did in state.votes[pid]){ if(state.votes[pid][did] && state.votes[pid][did].locId===id) state.votes[pid][did].locId=null; }} renderLocations(); renderVoteArea(); renderPairDateSelect(); persist(); })); renderPairDateSelect(); }
+
+    function renderDates(){ const el=q('#date-list'); el.innerHTML=''; state.dates.forEach(d=>{ const item=document.createElement('div'); item.className='item'; item.innerHTML=`<strong>${d.date}</strong> <div class="muted small">${d.slot}</div><div style="margin-top:6px"><button data-id="${d.id}" class="del-date" style="background:var(--red)">削除</button></div>`; el.appendChild(item); }); document.querySelectorAll('.del-date').forEach(b=>b.addEventListener('click',e=>{const id=e.target.dataset.id; state.dates=state.dates.filter(x=>x.id!==id); // remove votes and pairings
+      for(const pid in state.votes) delete state.votes[pid][id]; delete state.pairings[id]; renderDates(); renderVoteArea(); renderPairDateSelect(); persist(); })); renderPairDateSelect(); renderReportDateSelect(); }
+
+    function renderParticipants(){ const el=q('#participant-list'); el.innerHTML=''; state.participants.forEach(p=>{ const item=document.createElement('div'); item.className='item'; item.innerHTML=`<strong>${p.name}</strong> <div class="muted small">ID:${p.id}</div><div style="margin-top:6px"><button data-id="${p.id}" class="del-part" style="background:var(--red)">削除</button></div>`; el.appendChild(item); }); document.querySelectorAll('.del-part').forEach(b=>b.addEventListener('click',e=>{const id=e.target.dataset.id; state.participants=state.participants.filter(x=>x.id!==id); delete state.votes[id]; for(const did in state.pairings) state.pairings[did] = (state.pairings[did]||[]).filter(p=>!(p.members.includes(id));); renderParticipants(); renderVoteArea(); renderPairResult(); persist(); })); renderVoteParticipantSelect(); }
+
+    function renderVoteParticipantSelect(){ const sel=q('#vote-participant'); sel.innerHTML=''; state.participants.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=p.name; sel.appendChild(o); }); }
+
+    function renderVoteArea(){ const area=q('#vote-area'); area.innerHTML=''; if(state.participants.length===0 || state.dates.length===0){ area.innerHTML='<div class="muted">参加者と候補日を追加してください</div>'; return; }
+      const pid = q('#vote-participant').value || state.participants[0].id; const pname = (state.participants.find(p=>p.id===pid)||{}).name || '';
+      const header = document.createElement('div'); header.innerHTML=`<div class="muted small">投票者：<strong>${pname}</strong></div>`; area.appendChild(header);
+      state.dates.forEach(d=>{
+        const row = document.createElement('div'); row.className='item';
+        const vote = (state.votes[pid] && state.votes[pid][d.id]) || {available:false,locId:null};
+        let locOptions = '<option value="">（希望の配布場所を選択）</option>' + state.locations.map(l=>`<option value="${l.id}" ${vote.locId===l.id? 'selected': ''}>${l.name}</option>`).join('');
+        row.innerHTML = `<div><strong>${d.date}</strong> <span class="muted small">${d.slot}</span></div>
+          <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+            <button class="btn-yes" data-date="${d.id}" style="background:${vote.available? '#16a34a':'#e6f4ea'}">いける</button>
+            <button class="btn-no" data-date="${d.id}" style="background:${vote.available===false? '#dc2626':'#fdecec'}">いけない</button>
+            <select class="loc-select" data-date="${d.id}">${locOptions}</select>
+          </div>`;
+        area.appendChild(row);
+      });
+      // attach handlers
+      area.querySelectorAll('button.btn-yes').forEach(b=>b.addEventListener('click', e=>{const did=e.target.dataset.date; state.votes[pid]=state.votes[pid]||{}; state.votes[pid][did]=state.votes[pid][did]||{}; state.votes[pid][did].available=true; // keep loc
+        renderVoteArea(); persist(); }));
+      area.querySelectorAll('button.btn-no').forEach(b=>b.addEventListener('click', e=>{const did=e.target.dataset.date; state.votes[pid]=state.votes[pid]||{}; state.votes[pid][did]=state.votes[pid][did]||{}; state.votes[pid][did].available=false; state.votes[pid][did].locId=null; renderVoteArea(); persist(); }));
+      area.querySelectorAll('select.loc-select').forEach(s=>s.addEventListener('change', e=>{const did=e.target.dataset.date; const val=e.target.value||null; state.votes[pid]=state.votes[pid]||{}; state.votes[pid][did]=state.votes[pid][did]||{}; state.votes[pid][did].locId=val; persist(); }));
+    }
+
+    function renderPairDateSelect(){ const sel=q('#pair-date-select'); sel.innerHTML=''; state.dates.forEach(d=>{ const o=document.createElement('option'); o.value=d.id; o.textContent=`${d.date} ${d.slot}`; sel.appendChild(o); }); }
+    function renderReportDateSelect(){ const sel=q('#report-date'); sel.innerHTML=''; state.dates.forEach(d=>{ const o=document.createElement('option'); o.value=d.id; o.textContent=`${d.date} ${d.slot}`; sel.appendChild(o); }); renderReportPairSelect(); }
+    function renderReportPairSelect(){ const sel=q('#report-pair'); sel.innerHTML=''; const dateId = q('#report-date').value; const pairs = state.pairings[dateId]||[]; pairs.forEach(p=>{ const o=document.createElement('option'); o.value=p.pairId; o.textContent = `${p.members.map(id=> (state.participants.find(x=>x.id===id)||{name:id}).name).join(' & ')} @ ${ (state.locations.find(l=>l.id===p.locId)||{name:'未指定'}).name }`; sel.appendChild(o); }); }
+
+    function renderPairResult(){ const out=q('#pair-result'); out.innerHTML=''; const dateId = q('#pair-date-select').value; if(!dateId) return out.innerHTML='<div class="muted">日付を選んでから実行してください</div>';
+      const pairs = state.pairings[dateId] || [];
+      if(pairs.length===0) return out.innerHTML='<div class="muted">まだペアがありません（ペアリングを実行してください）</div>';
+      pairs.forEach(p=>{
+        const d = document.createElement('div'); d.className='pair'; d.innerHTML = `<div><strong>${p.members.map(id=> (state.participants.find(x=>x.id===id)||{name:id}).name).join(' & ')}</strong> <span class="muted small">＠${ (state.locations.find(l=>l.id===p.locId)||{name:'未指定'}).name }</span></div><div style="margin-top:6px"><button data-date="${dateId}" data-pair="${p.pairId}" class="edit-pair">編集</button> <button data-date="${dateId}" data-pair="${p.pairId}" class="del-pair" style="background:var(--red)">削除</button></div>`;
+        out.appendChild(d);
+      });
+      // attach
+      out.querySelectorAll('.del-pair').forEach(b=>b.addEventListener('click', e=>{ const dateId=e.target.dataset.date; const pairId=e.target.dataset.pair; state.pairings[dateId]=state.pairings[dateId].filter(p=>p.pairId!==pairId); renderPairResult(); renderReportPairSelect(); persist(); }));
+      out.querySelectorAll('.edit-pair').forEach(b=>b.addEventListener('click', e=>{ const dateId=e.target.dataset.date; const pairId=e.target.dataset.pair; const p = (state.pairings[dateId]||[]).find(x=>x.pairId===pairId); if(!p) return; const newLoc = prompt('配布場所を設定（場所ID）', p.locId||''); if(newLoc!==null){ p.locId = newLoc||null; renderPairResult(); renderReportPairSelect(); persist(); } }));
+    }
+
+    // --- Pairing algorithm ---
+    function runPairingForDate(dateId){ const pairs = []; const available = []; // participants available this date
+      state.participants.forEach(p=>{ const v = (state.votes[p.id] && state.votes[p.id][dateId]); if(v && v.available) available.push({id:p.id,locId:v.locId}); });
+      // group by locId
+      const byLoc = {};
+      available.forEach(a=>{ const key = a.locId || '__NOLOC__'; byLoc[key]=byLoc[key]||[]; byLoc[key].push(a.id); });
+      // pair within same loc
+      for(const loc in byLoc){ const arr = byLoc[loc]; while(arr.length>=2){ const a = arr.shift(); const b = arr.shift(); pairs.push({members:[a,b], locId: loc==='__NOLOC__'? null: loc, pairId: uid(8)}); }
+        // remaining singles stay in a leftover pool
+        byLoc[loc]=arr; }
+      const leftovers = []; for(const loc in byLoc) leftovers.push(...byLoc[loc]);
+      // pair leftovers arbitrarily
+      while(leftovers.length>=2){ const a=leftovers.shift(); const b=leftovers.shift(); pairs.push({members:[a,b], locId:null, pairId: uid(8)}); }
+      // leftover single => single-person assignment
+      if(leftovers.length===1){ pairs.push({members:[leftovers[0]], locId:null, pairId: uid(8)}); }
+      state.pairings[dateId]=pairs; persist(); return pairs; }
+
+    // --- Reports ---
+    q('#report-photos').addEventListener('change', async (e)=>{/* preview handled on save */});
+    q('#save-report').addEventListener('click', async ()=>{
+      const dateId = q('#report-date').value; const pairId = q('#report-pair').value; if(!dateId||!pairId) return alert('対象日とペアを選んでください');
+      const note = q('#report-note').value.trim(); const files = q('#report-photos').files; const photos = [];
+      for(const f of files){ photos.push(await fileToDataURL(f)); }
+      state.reports.push({dateId,pairId,note,photos,timestamp:new Date().toISOString()}); q('#report-note').value=''; q('#report-photos').value=''; alert('記録を保存しました'); renderReports(); persist(); });
+    function renderReports(){ const el=q('#reports-list'); el.innerHTML=''; if(state.reports.length===0){ el.innerHTML='<div class="muted">記録はありません</div>'; return; }
+      state.reports.slice().reverse().forEach(r=>{ const d = document.createElement('div'); d.className='item'; const pair = (state.pairings[r.dateId]||[]).find(p=>p.pairId===r.pairId) || {members:[],locId:null}; d.innerHTML = `<div><strong>${ (state.dates.find(x=>x.id===r.dateId)||{date:r.dateId}).date || r.dateId } — ${ pair.members.map(id=> (state.participants.find(pp=>pp.id===id)||{name:id}).name ).join(' & ') }</strong></div>
+        <div class="muted small">${ (state.locations.find(l=>l.id===pair.locId)||{name:'未指定'}).name } — ${new Date(r.timestamp).toLocaleString()}</div>
+        <div style="margin-top:6px">${r.note||'<span class=\"muted\">感想なし</span>'}</div>
+        <div class="photos" style="margin-top:6px">${r.photos.map(p=>`<img src="${p}"/>`).join('')}</div>`; el.appendChild(d);
+      }); }
+
+    // --- Chat ---
+    function renderChat(){ const box=q('#chat-box'); box.innerHTML=''; state.chat.forEach(c=>{ const d=document.createElement('div'); d.className='item'; d.innerHTML=`<div><strong>${escapeHtml(c.name)}</strong> <span class="muted small">${new Date(c.ts).toLocaleString()}</span></div><div style="margin-top:6px">${escapeHtml(c.msg)}</div>`; box.appendChild(d); }); box.scrollTop = box.scrollHeight; }
+    q('#send-chat').addEventListener('click', ()=>{ const name=q('#chat-name').value.trim()||'unknown'; const msg=q('#chat-msg').value.trim(); if(!msg) return; state.chat.push({name,msg,ts:new Date().toISOString()}); q('#chat-msg').value=''; renderChat(); persist(); });
+
+    // --- Utilities ---
+    function fileToDataURL(file){ return new Promise(res=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.readAsDataURL(file); }); }
+    function escapeHtml(s){ return (s+'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+    // --- Event bindings ---
+    q('#add-loc').addEventListener('click', ()=>{ const name=q('#loc-name').value.trim(); if(!name) return alert('場所名を入力'); const id=uid(6); state.locations.push({id,name}); q('#loc-name').value=''; renderLocations(); renderVoteArea(); persist(); });
+    q('#clear-locs').addEventListener('click', ()=>{ if(!confirm('本当に全ての配布場所を削除しますか？')) return; state.locations=[]; renderLocations(); renderVoteArea(); persist(); });
+
+    q('#add-date').addEventListener('click', ()=>{ const d=q('#date-input').value; const slot=q('#time-slot').value; if(!d) return alert('日付を選んでください'); const id=uid(6); state.dates.push({id,date:d,slot}); q('#date-input').value=''; renderDates(); persist(); });
+    q('#clear-dates').addEventListener('click', ()=>{ if(!confirm('全ての候補日を削除しますか？')) return; state.dates=[]; renderDates(); persist(); });
+
+    q('#add-participant').addEventListener('click', ()=>{ const name=q('#participant-name').value.trim(); if(!name) return alert('名前を入れてください'); const id=uid(6); state.participants.push({id,name}); state.votes[id] = state.votes[id]||{}; q('#participant-name').value=''; renderParticipants(); persist(); });
+    q('#clear-participants').addEventListener('click', ()=>{ if(!confirm('本当に全参加者を削除しますか？')) return; state.participants=[]; state.votes={}; renderParticipants(); renderVoteArea(); persist(); });
+
+    q('#start-vote').addEventListener('click', ()=>renderVoteArea());
+
+    q('#run-pairing').addEventListener('click', ()=>{ const dateId=q('#pair-date-select').value; if(!dateId) return alert('日付を選んでください'); runPairingForDate(dateId); renderPairResult(); renderReportPairSelect(); alert('ペアリング完了'); });
+    q('#auto-assign').addEventListener('click', ()=>{ state.dates.forEach(d=> runPairingForDate(d.id)); renderPairResult(); renderReportPairSelect(); alert('全日自動ペアリングを実行しました'); });
+
+    q('#view-reports').addEventListener('click', ()=>renderReports());
+
+    q('#save-local').addEventListener('click', ()=>{ persist(); alert('保存しました（localStorage）'); });
+    q('#load-local').addEventListener('click', ()=>{ const raw=localStorage.getItem('tissue_state'); if(!raw) return alert('保存データがありません'); Object.assign(state, JSON.parse(raw)); renderAll(); alert('読み込みました'); });
+    q('#export-json').addEventListener('click', ()=>{ navigator.clipboard.writeText(JSON.stringify(state,null,2)).then(()=>alert('共有用JSONをコピーしました')); });
+
+    q('#report-date').addEventListener('change', ()=>renderReportPairSelect());
+
+    // --- Initial render ---
+    function renderAll(){ renderLocations(); renderDates(); renderParticipants(); renderVoteArea(); renderPairDateSelect(); renderReportDateSelect(); renderPairResult(); renderReports(); renderChat(); }
+
+    // load existing
+    (function init(){ const raw=localStorage.getItem('tissue_state'); if(raw){ try{ const parsed=JSON.parse(raw); Object.assign(state, parsed); }catch(e){} } renderAll(); })();
+  </script>
+</body>
+</html>
